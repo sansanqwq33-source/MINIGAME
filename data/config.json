@@ -16,12 +16,15 @@
       "schedules": [
         { "loc": "hallway", "start": 540, "end": 1440 }
       ],
-      "dialogues": {
-        "default": { "cost": 10 },
-        "ask_key": { "cost": 5, "setFlag": "knows_about_key" }
-      }
-    }
-  },
+      "interactions": {
+        "root": {
+          "prompt": "角色A看着你，似乎在等你开口。",
+          "options": [
+            { "label": "询问情况", "topicId": "ask_default", "cost": 5 },
+            { "label": "出示【银色钥匙】", "topicId": "show_key", "reqKeyword": "银色钥匙", "cost": 10 },
+            { "label": "没什么事", "action": "cancel", "cost": 0 }
+          ]
+  }},
   "puzzle": {
     "template": "事件的起因是 {who} 弄丢了 {item}。",
     "answers": { "who": "角色A", "item": "银色钥匙" }
