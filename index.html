@@ -2,274 +2,280 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Time Loop Engine</title>
+    <title>时间循环框架</title>
     <style>
-        body { display: grid; grid-template-columns: 200px 1fr 250px; height: 100vh; margin: 0; background: #f4f1ea; font-family: sans-serif; }
-        
-        /* 顶部时间与状态 */
-        #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: #333; color: white; display: flex; align-items: center; padding: 0 20px; z-index: 10; }
-        #clock { font-size: 1.5rem; font-weight: bold; color: #d4af37; margin-right: 20px; }
+        body { display: grid; grid-template-columns: 250px 1fr 300px; height: 100vh; margin: 0; background: #f4f1ea; font-family: "serif"; color: #333; }
         
         /* 布局面板 */
-        #left-panel { border-right: 1px solid #ccc; padding: 70px 20px 20px; background: #e2dfd8; overflow-y: auto; }
-        #center-panel { padding: 70px 40px 20px; position: relative; overflow-y: auto; }
-        #right-panel { border-left: 1px solid #ccc; padding: 70px 20px 20px; background: #e2dfd8; }
+        .panel { padding: 20px; overflow-y: auto; }
+        #left-panel { background: #e2dfd8; border-right: 2px solid #ccc; position: relative; }
+        #center-panel { padding: 40px; position: relative; line-height: 1.8; font-size: 1.1rem; }
+        #right-panel { background: #e2dfd8; border-left: 2px solid #ccc; }
 
         /* UI 组件 */
-        .nav-btn { display: block; width: 100%; padding: 10px; margin-bottom: 10px; cursor: pointer; background: white; border: 1px solid #999; text-align: left; }
-        .nav-btn:hover { background: #eee; }
-        .npc-tag { display: inline-block; padding: 5px 10px; background: #2a5caa; color: white; border-radius: 4px; cursor: pointer; margin-right: 10px; }
-        .char-card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 0.9rem; }
-        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 5px; margin: 2px; border-radius: 3px; font-size: 0.8rem; }
-        
-        /* 对话框 */
-        #dialogue-box { background: white; border: 2px solid #333; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
-        .choice-btn { display: block; width: 100%; padding: 10px; margin-top: 10px; cursor: pointer; background: #f0f0f0; border: 1px solid #ccc; text-align: left; }
-        .choice-btn:hover { background: #e0e0e0; }
+        #time-display { position: absolute; top: 10px; left: 10px; font-size: 1.5rem; font-weight: bold; color: #8b0000; border: 2px solid #8b0000; padding: 5px 15px; border-radius: 5px; background: white; }
+        #nav-bar { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #ccc; }
+        .nav-btn { margin-right: 10px; padding: 5px 10px; cursor: pointer; }
 
-        /* 遮罩层 (24:00专用) */
-        #overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: none; color: white; padding: 100px; text-align: center; }
-        #reset-btn { margin-top: 30px; padding: 10px 30px; font-size: 1.2rem; cursor: pointer; }
+        /* 人物档案与对话 */
+        .char-card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 4px; border-left: 4px solid #555; }
+        #dialogue-box { background: #222; color: white; padding: 20px; border-radius: 8px; margin-top: 30px; display: none; }
+        
+        /* 交互元素 */
+        .interact { color: #2a5caa; cursor: pointer; font-weight: bold; text-decoration: underline; }
+        .keyword { color: #8b0000; cursor: pointer; font-weight: bold; padding: 0 4px; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .keyword:hover { border-bottom: 2px solid #8b0000; background: rgba(139,0,0,0.1); }
+        
+        /* 收集到的关键词（增加醒目特效） */
+        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 8px 12px; margin: 5px; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.1s ease-in-out; user-select: none; }
+        .keyword-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .keyword-item:active { transform: scale(0.95); background: #a50000; box-shadow: 0 0 10px #ff4d4d; }
+        .keyword-item.selected { outline: 3px solid #ffaa00; background: #5a0000; }
+
+        /* 填空位 */
+        .keyword-slot { display: inline-block; min-width: 60px; border-bottom: 2px dashed #8b0000; margin: 0 5px; text-align: center; cursor: pointer; color: #8b0000; font-weight: bold; padding-bottom: 2px; }
+
+        /* 强制事件遮罩 */
+        #idol-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; text-align: center; padding: 50px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-    <div id="top-bar">
-        <div id="clock">09:00</div>
-        <div id="current-loc-name">当前位置：大厅</div>
+    <div id="left-panel" class="panel">
+        <div id="time-display">09:00</div>
+        <h3 style="margin-top: 60px;">人物档案</h3>
+        <div id="char-list"></div>
     </div>
 
-    <div id="left-panel">
-        <h3>移动 (耗时10m)</h3>
-        <div id="nav-area"></div>
-        <hr>
-        <h3>人物档案</h3>
-        <div id="profile-area"></div>
-    </div>
-
-    <div id="center-panel">
-        <div id="scene-desc" style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 20px;"></div>
+    <div id="center-panel" class="panel">
+        <div id="nav-bar"></div>
+        <h2 id="loc-name"></h2>
+        <div id="story-text"></div>
+        <div id="npc-area" style="margin-top: 20px;"></div>
         
-        <div id="npc-area" style="margin-bottom: 20px;"></div>
-
         <div id="dialogue-box">
-            <div id="dialogue-text" style="margin-bottom: 15px; font-weight: bold;"></div>
-            <div id="choices-area"></div>
+            <strong id="speaker"></strong>
+            <p id="content"></p>
+            <button onclick="document.getElementById('dialogue-box').style.display='none'">结束对话</button>
         </div>
     </div>
 
-    <div id="right-panel">
-        <h3>已获线索</h3>
-        <div id="inventory-area"></div>
+    <div id="right-panel" class="panel">
+        <h3>解密区域</h3>
+        <div id="puzzle-area"></div>
+        <button onclick="checkWin()" style="margin-top:20px; padding: 10px; width: 100%;">验证真相</button>
+        <hr style="margin: 20px 0;">
+        <h3>线索记录</h3>
+        <div id="inventory"></div>
     </div>
 
-    <div id="overlay">
-        <h2>24:00 钟声敲响</h2>
-        <p id="idol-text"></p>
-        <button id="reset-btn" onclick="resetLoop()">重新开始这一天</button>
+    <div id="idol-overlay">
+        <h2 style="color: #d4af37;">时间已尽</h2>
+        <div id="idol-text" style="max-width: 600px; line-height: 2; margin-bottom: 40px; font-size: 1.2rem;"></div>
+        <button onclick="resetLoop()" style="padding: 15px 30px; font-size: 1.1rem; cursor: pointer;">重启这一天</button>
     </div>
 
     <script>
-        // --- 数据区 (实际开发中应从 data.json fetch) ---
-        const gameData = {
-            locations: {
-                "hall": { "name": "大厅", "desc": "一楼的大厅，墙上挂着古老的时钟。" },
-                "garden": { "name": "花园", "desc": "杂草丛生的花园，光线昏暗。" }
-            },
-            characters: {
-                "charA": { "name": "管家", "profile": "右腿似乎受过伤。" },
-                "charB": { "name": "园丁", "profile": "身上总带着泥土味。" }
-            },
-            schedules: {
-                "charA": {
-                    "default": [ { "start": 540, "end": 720, "loc": "hall" }, { "start": 720, "end": 1440, "loc": "garden" } ],
-                    "angry_route": [ { "start": 540, "end": 1440, "loc": "hall" } ]
-                },
-                "charB": {
-                    "default": [ { "start": 540, "end": 1440, "loc": "garden" } ]
-                }
-            },
-            dialogues: {
-                "charA_meet": {
-                    "text": "管家：您需要点什么吗？",
-                    "choices": [
-                        { "text": "询问他的腿伤 (耗时10m)", "timeCost": 10, "actions": [{ "type": "unlockProfile", "target": "charA" }, { "type": "addKeyword", "target": "拐杖" }], "next": "charA_talk_leg" },
-                        { "text": "指责他在说谎 (触发日程改变)", "timeCost": 5, "actions": [{ "type": "unlockProfile", "target": "charA" }, { "type": "changeSchedule", "target": "charA", "newRoute": "angry_route" }], "next": "charA_angry" }
-                    ]
-                },
-                "charA_talk_leg": { "text": "管家：这是旧伤了...（获得【拐杖】）", "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }] },
-                "charA_angry": { "text": "管家：您太过分了！我今天哪都不去，就在这盯着您！", "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }] }
-            }
+        let db = null;
+        
+        // 游戏状态
+        let state = {
+            time: 540,
+            location: "",
+            flags: {},
+            unlockedChars: [],
+            keywords: [],
+            selectedKeyword: null
         };
 
-        // --- 状态区 ---
-        let time = 540; // 9:00
-        let currentLoc = "hall";
-        
-        // 跨越循环保留的状态
-        let knownCharacters = new Set();
-        let inventory = new Set();
-        
-        // 当前循环动态状态
-        let activeSchedules = { "charA": "default", "charB": "default" };
-
-        // --- 核心逻辑 ---
-
-        function init() {
+        async function initGame() {
+            // 本地测试时，如果 fetch 报错，可以把上面的 JSON 直接粘成 const db = { ... }
+            const res = await fetch('./data/config.json');
+            db = await res.json();
+            
+            // 初始化导航栏和解密区
             renderNav();
-            updateScene();
-            renderProfiles();
-            renderInventory();
+            renderPuzzle();
+            
+            // 开始第一天
+            startDay();
         }
 
-        // 时间管理
+        function startDay() {
+            state.time = db.startState.time;
+            state.location = db.startState.location;
+            state.flags = {}; // 清空事件标志
+            
+            // 保留人物档案和关键词，无需清空 state.unlockedChars 和 state.keywords
+            
+            document.getElementById('idol-overlay').style.display = 'none';
+            updateUI();
+        }
+
+        function formatTime(minutes) {
+            const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+            const m = (minutes % 60).toString().padStart(2, '0');
+            return `${h}:${m}`;
+        }
+
+        // --- 核心时间与场景调度 ---
+
         function advanceTime(minutes) {
-            time += minutes;
-            if (time >= 1440) {
-                time = 1440;
+            state.time += minutes;
+            updateUI();
+            
+            if (state.time >= 1440) { // 24:00
                 triggerIdolEvent();
             }
-            updateClockDisplay();
         }
 
-        function updateClockDisplay() {
-            let h = Math.floor(time / 60);
-            let m = time % 60;
-            document.getElementById('clock').innerText = 
-                `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        }
-
-        // 移动
-        function travelTo(locId) {
-            advanceTime(10); // 移动耗时10分钟
-            currentLoc = locId;
-            document.getElementById('dialogue-box').style.display = 'none';
-            if (time < 1440) updateScene();
-        }
-
-        // 渲染当前场景和角色
-        function updateScene() {
-            const locData = gameData.locations[currentLoc];
-            document.getElementById('current-loc-name').innerText = `当前位置：${locData.name}`;
-            document.getElementById('scene-desc').innerText = locData.desc;
-
-            const npcArea = document.getElementById('npc-area');
-            npcArea.innerHTML = '';
-
-            // 检查谁在这里
-            for (let charId in gameData.characters) {
-                let currentSchedule = activeSchedules[charId] || "default";
-                let routes = gameData.schedules[charId][currentSchedule];
-                
-                for (let block of routes) {
-                    if (time >= block.start && time < block.end && block.loc === currentLoc) {
-                        let btn = document.createElement('span');
-                        btn.className = 'npc-tag';
-                        btn.innerText = `与 ${gameData.characters[charId].name} 对话`;
-                        // 简化：首次对话统一调用 charID_meet 节点
-                        btn.onclick = () => startDialogue(`${charId}_meet`);
-                        npcArea.appendChild(btn);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 对话系统与动作解析
-        function startDialogue(nodeId) {
-            if (!nodeId) {
-                document.getElementById('dialogue-box').style.display = 'none';
-                updateScene(); // 对话结束，刷新场景看是否有人离开
-                return;
-            }
-
-            const node = gameData.dialogues[nodeId];
-            if (!node) return;
-
-            document.getElementById('dialogue-box').style.display = 'block';
-            document.getElementById('dialogue-text').innerText = node.text;
-
-            const choicesArea = document.getElementById('choices-area');
-            choicesArea.innerHTML = '';
-
-            node.choices.forEach(choice => {
-                let btn = document.createElement('button');
-                btn.className = 'choice-btn';
-                btn.innerText = choice.text;
-                btn.onclick = () => {
-                    advanceTime(choice.timeCost);
-                    processActions(choice.actions);
-                    startDialogue(choice.next);
-                };
-                choicesArea.appendChild(btn);
-            });
-        }
-
-        function processActions(actions) {
-            if (!actions) return;
-            actions.forEach(action => {
-                if (action.type === 'unlockProfile') {
-                    knownCharacters.add(action.target);
-                    renderProfiles();
-                } else if (action.type === 'addKeyword') {
-                    inventory.add(action.target);
-                    renderInventory();
-                } else if (action.type === 'changeSchedule') {
-                    activeSchedules[action.target] = action.newRoute;
-                }
-            });
-        }
-
-        // 渲染周边 UI
-        function renderNav() {
-            const navArea = document.getElementById('nav-area');
-            navArea.innerHTML = '';
-            for (let locId in gameData.locations) {
-                let btn = document.createElement('button');
-                btn.className = 'nav-btn';
-                btn.innerText = `前往 ${gameData.locations[locId].name}`;
-                btn.onclick = () => travelTo(locId);
-                navArea.appendChild(btn);
-            }
-        }
-
-        function renderProfiles() {
-            const area = document.getElementById('profile-area');
-            area.innerHTML = '';
-            knownCharacters.forEach(charId => {
-                const c = gameData.characters[charId];
-                area.innerHTML += `<div class="char-card"><strong>${c.name}</strong><br>${c.profile}</div>`;
-            });
-        }
-
-        function renderInventory() {
-            const area = document.getElementById('inventory-area');
-            area.innerHTML = '';
-            inventory.forEach(word => {
-                area.innerHTML += `<span class="keyword-item">${word}</span>`;
-            });
-        }
-
-        // 结局与重置
         function triggerIdolEvent() {
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('idol-text').innerText = "时间到了。带着你收集的线索，重新再来一次吧。";
+            const overlay = document.getElementById('idol-overlay');
+            document.getElementById('idol-text').innerText = db.idolEvent.text;
+            overlay.style.display = 'flex';
         }
 
         function resetLoop() {
-            time = 540;
-            currentLoc = "hall";
-            // 恢复默认日程
-            activeSchedules = { "charA": "default", "charB": "default" };
-            
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('dialogue-box').style.display = 'none';
-            
-            updateClockDisplay();
-            updateScene();
+            startDay();
         }
 
-        window.onload = init;
+        function changeLocation(locId) {
+            state.location = locId;
+            advanceTime(10); // 移动消耗10分钟
+        }
+
+        // --- UI 渲染更新 ---
+
+        function updateUI() {
+            document.getElementById('time-display').innerText = formatTime(state.time);
+            
+            // 1. 渲染当前地点基础文本
+            const locData = db.locations[state.location];
+            document.getElementById('loc-name').innerText = locData.name;
+            document.getElementById('story-text').innerHTML = locData.baseText;
+
+            // 2. 计算当前地点有哪些 NPC
+            let npcHTML = "";
+            for (let charId in db.characters) {
+                if (charId === 'idol') continue; // 排除特殊角色
+                const char = db.characters[charId];
+                const activeSchedule = char.schedules.find(s => {
+                    // 检查时间
+                    if (state.time < s.start || state.time >= s.end) return false;
+                    // 检查前置条件
+                    if (s.reqFlag && !state.flags[s.reqFlag]) return false;
+                    // 检查排他条件
+                    if (s.excludeFlag && state.flags[s.excludeFlag]) return false;
+                    return true;
+                });
+
+                if (activeSchedule && activeSchedule.loc === state.location) {
+                    npcHTML += `<p>你在这里看到了 <span class='interact' onclick='talkTo("${charId}")'>${char.name}</span>。</p>`;
+                }
+            }
+            document.getElementById('npc-area').innerHTML = npcHTML;
+            document.getElementById('dialogue-box').style.display = 'none'; // 切换场景或时间流逝后关闭对话框
+        }
+
+        function renderNav() {
+            let html = "";
+            for (let locId in db.locations) {
+                html += `<button class="nav-btn" onclick="changeLocation('${locId}')">前往${db.locations[locId].name}</button>`;
+            }
+            document.getElementById('nav-bar').innerHTML = html;
+        }
+
+        // --- 交互系统 ---
+
+        function talkTo(charId) {
+            // 解锁档案
+            if (!state.unlockedChars.includes(charId)) {
+                state.unlockedChars.push(charId);
+                renderProfiles();
+            }
+
+            const char = db.characters[charId];
+            const diag = char.dialogues.default; // 这里可以扩展为根据 flags 选取不同的对话
+
+            document.getElementById('dialogue-box').style.display = 'block';
+            document.getElementById('speaker').innerText = char.name;
+            document.getElementById('content').innerHTML = diag.text;
+
+            // 记录 flag 和耗时
+            if (diag.setFlag) state.flags[diag.setFlag] = true;
+            if (diag.cost) advanceTime(diag.cost);
+        }
+
+        function renderProfiles() {
+            const list = document.getElementById('char-list');
+            list.innerHTML = state.unlockedChars.map(id => `
+                <div class="char-card">
+                    <strong>${db.characters[id].name}</strong><br>
+                    <small>${db.characters[id].profile}</small>
+                </div>
+            `).join('');
+        }
+
+        // --- 解密与关键词 ---
+
+        function collectKeyword(word) {
+            if (!state.keywords.includes(word)) {
+                state.keywords.push(word);
+                renderInventory();
+                // 阻止事件冒泡，防止点击关键词时触发父元素的关闭等操作
+                event.stopPropagation(); 
+            }
+        }
+
+        function renderInventory() {
+            const div = document.getElementById('inventory');
+            div.innerHTML = state.keywords.map(w => 
+                `<span class="keyword-item" onclick="selectKeyword(this, '${w}')">${w}</span>`
+            ).join('');
+        }
+
+        function selectKeyword(element, word) {
+            state.selectedKeyword = word;
+            // 处理UI高亮
+            document.querySelectorAll('.keyword-item').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        function renderPuzzle() {
+            let html = db.puzzle.template;
+            Object.keys(db.puzzle.answers).forEach(key => {
+                html = html.replace(`{${key}}`, `<span class="keyword-slot" id="slot-${key}" onclick="fillSlot(this)">____</span>`);
+            });
+            document.getElementById('puzzle-area').innerHTML = html;
+        }
+
+        function fillSlot(el) {
+            if (state.selectedKeyword) {
+                el.innerText = state.selectedKeyword;
+                state.selectedKeyword = null;
+                document.querySelectorAll('.keyword-item').forEach(el => el.classList.remove('selected'));
+            } else {
+                el.innerText = "____";
+            }
+        }
+
+        function checkWin() {
+            let isWin = true;
+            Object.keys(db.puzzle.answers).forEach(key => {
+                if (document.getElementById(`slot-${key}`).innerText !== db.puzzle.answers[key]) {
+                    isWin = false;
+                }
+            });
+            
+            if (isWin) {
+                alert("真相大白！你成功打破了循环。");
+            } else {
+                alert("线索似乎拼凑不上，再找找看...");
+                advanceTime(5); // 验错惩罚时间
+            }
+        }
+
+        window.onload = initGame;
     </script>
 </body>
 </html>
