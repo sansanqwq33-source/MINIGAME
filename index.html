@@ -2,41 +2,35 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>时间循环框架</title>
+    <title>时间循环：MD数据驱动版</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { display: grid; grid-template-columns: 250px 1fr 300px; height: 100vh; margin: 0; background: #f4f1ea; font-family: "serif"; color: #333; }
         
-        /* 布局面板 */
         .panel { padding: 20px; overflow-y: auto; }
         #left-panel { background: #e2dfd8; border-right: 2px solid #ccc; position: relative; }
         #center-panel { padding: 40px; position: relative; line-height: 1.8; font-size: 1.1rem; }
         #right-panel { background: #e2dfd8; border-left: 2px solid #ccc; }
 
-        /* UI 组件 */
         #time-display { position: absolute; top: 10px; left: 10px; font-size: 1.5rem; font-weight: bold; color: #8b0000; border: 2px solid #8b0000; padding: 5px 15px; border-radius: 5px; background: white; }
         #nav-bar { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #ccc; }
         .nav-btn { margin-right: 10px; padding: 5px 10px; cursor: pointer; }
 
-        /* 人物档案与对话 */
         .char-card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 4px; border-left: 4px solid #555; }
-        #dialogue-box { background: #222; color: white; padding: 20px; border-radius: 8px; margin-top: 30px; display: none; }
         
-        /* 交互元素 */
+        /* 对话框与调查框通用样式 */
+        #dialogue-box { background: #222; color: #eee; padding: 25px; border-radius: 8px; margin-top: 30px; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        #dialogue-box h4 { margin: 0 0 10px 0; color: #d4af37; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        #dialogue-box p { margin-bottom: 0; }
+        
         .interact { color: #2a5caa; cursor: pointer; font-weight: bold; text-decoration: underline; }
         .keyword { color: #8b0000; cursor: pointer; font-weight: bold; padding: 0 4px; border-bottom: 2px solid transparent; transition: all 0.2s; }
         .keyword:hover { border-bottom: 2px solid #8b0000; background: rgba(139,0,0,0.1); }
         
-        /* 收集到的关键词（增加醒目特效） */
-        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 8px 12px; margin: 5px; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.1s ease-in-out; user-select: none; }
+        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 8px 12px; margin: 5px; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.1s; user-select: none; }
         .keyword-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        .keyword-item:active { transform: scale(0.95); background: #a50000; box-shadow: 0 0 10px #ff4d4d; }
         .keyword-item.selected { outline: 3px solid #ffaa00; background: #5a0000; }
-
-        /* 填空位 */
         .keyword-slot { display: inline-block; min-width: 60px; border-bottom: 2px dashed #8b0000; margin: 0 5px; text-align: center; cursor: pointer; color: #8b0000; font-weight: bold; padding-bottom: 2px; }
-
-        /* 强制事件遮罩 */
-        #idol-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; text-align: center; padding: 50px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -50,13 +44,15 @@
     <div id="center-panel" class="panel">
         <div id="nav-bar"></div>
         <h2 id="loc-name"></h2>
-        <div id="story-text"></div>
-        <div id="npc-area" style="margin-top: 20px;"></div>
+        
+        <div id="story-text">加载中...</div>
+        
+        <div id="npc-area" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #ccc;"></div>
         
         <div id="dialogue-box">
-            <strong id="speaker"></strong>
-            <p id="content"></p>
-            <button onclick="document.getElementById('dialogue-box').style.display='none'">结束对话</button>
+            <h4 id="speaker"></h4>
+            <div id="content"></div>
+            <button onclick="closeDialogue()" style="margin-top: 15px; padding: 5px 15px;">关闭</button>
         </div>
     </div>
 
@@ -69,16 +65,10 @@
         <div id="inventory"></div>
     </div>
 
-    <div id="idol-overlay">
-        <h2 style="color: #d4af37;">时间已尽</h2>
-        <div id="idol-text" style="max-width: 600px; line-height: 2; margin-bottom: 40px; font-size: 1.2rem;"></div>
-        <button onclick="resetLoop()" style="padding: 15px 30px; font-size: 1.1rem; cursor: pointer;">重启这一天</button>
-    </div>
-
     <script>
         let db = null;
+        let mdCache = {}; // 用于缓存已加载的MD文件，避免重复请求
         
-        // 游戏状态
         let state = {
             time: 540,
             location: "",
@@ -88,27 +78,33 @@
             selectedKeyword: null
         };
 
+        // --- 工具函数：读取并解析 MD 文件 ---
+        async function fetchMD(path) {
+            if (mdCache[path]) return mdCache[path]; // 如果缓存里有，直接用
+            try {
+                const res = await fetch(path);
+                const text = await res.text();
+                const html = marked.parse(text);
+                mdCache[path] = html;
+                return html;
+            } catch (err) {
+                console.error("加载MD失败:", path);
+                return `<p style="color:red;">无法加载文件: ${path}</p>`;
+            }
+        }
+
         async function initGame() {
-            // 本地测试时，如果 fetch 报错，可以把上面的 JSON 直接粘成 const db = { ... }
             const res = await fetch('./data/config.json');
             db = await res.json();
-            
-            // 初始化导航栏和解密区
             renderNav();
             renderPuzzle();
-            
-            // 开始第一天
             startDay();
         }
 
         function startDay() {
             state.time = db.startState.time;
             state.location = db.startState.location;
-            state.flags = {}; // 清空事件标志
-            
-            // 保留人物档案和关键词，无需清空 state.unlockedChars 和 state.keywords
-            
-            document.getElementById('idol-overlay').style.display = 'none';
+            state.flags = {}; 
             updateUI();
         }
 
@@ -118,63 +114,48 @@
             return `${h}:${m}`;
         }
 
-        // --- 核心时间与场景调度 ---
-
         function advanceTime(minutes) {
             state.time += minutes;
-            updateUI();
-            
-            if (state.time >= 1440) { // 24:00
-                triggerIdolEvent();
-            }
+            updateTimeDisplay();
         }
 
-        function triggerIdolEvent() {
-            const overlay = document.getElementById('idol-overlay');
-            document.getElementById('idol-text').innerText = db.idolEvent.text;
-            overlay.style.display = 'flex';
-        }
-
-        function resetLoop() {
-            startDay();
+        function updateTimeDisplay() {
+            document.getElementById('time-display').innerText = formatTime(state.time);
         }
 
         function changeLocation(locId) {
             state.location = locId;
-            advanceTime(10); // 移动消耗10分钟
+            advanceTime(10);
+            updateUI();
         }
 
-        // --- UI 渲染更新 ---
-
-        function updateUI() {
-            document.getElementById('time-display').innerText = formatTime(state.time);
+        // --- 核心：渲染 UI 与解析场景 ---
+        async function updateUI() {
+            updateTimeDisplay();
+            closeDialogue();
             
-            // 1. 渲染当前地点基础文本
             const locData = db.locations[state.location];
             document.getElementById('loc-name').innerText = locData.name;
-            document.getElementById('story-text').innerHTML = locData.baseText;
+            
+            // 异步加载当前场景的 MD 文本
+            const sceneHTML = await fetchMD(`./data/scenes/${locData.file}`);
+            document.getElementById('story-text').innerHTML = sceneHTML;
 
-            // 2. 计算当前地点有哪些 NPC
+            // 渲染该地点的 NPC
             let npcHTML = "";
             for (let charId in db.characters) {
-                if (charId === 'idol') continue; // 排除特殊角色
                 const char = db.characters[charId];
-                const activeSchedule = char.schedules.find(s => {
-                    // 检查时间
-                    if (state.time < s.start || state.time >= s.end) return false;
-                    // 检查前置条件
-                    if (s.reqFlag && !state.flags[s.reqFlag]) return false;
-                    // 检查排他条件
-                    if (s.excludeFlag && state.flags[s.excludeFlag]) return false;
-                    return true;
-                });
+                const activeSchedule = char.schedules.find(s => 
+                    state.time >= s.start && state.time < s.end &&
+                    (!s.reqFlag || state.flags[s.reqFlag]) &&
+                    (!s.excludeFlag || !state.flags[s.excludeFlag])
+                );
 
                 if (activeSchedule && activeSchedule.loc === state.location) {
                     npcHTML += `<p>你在这里看到了 <span class='interact' onclick='talkTo("${charId}")'>${char.name}</span>。</p>`;
                 }
             }
             document.getElementById('npc-area').innerHTML = npcHTML;
-            document.getElementById('dialogue-box').style.display = 'none'; // 切换场景或时间流逝后关闭对话框
         }
 
         function renderNav() {
@@ -185,26 +166,51 @@
             document.getElementById('nav-bar').innerHTML = html;
         }
 
-        // --- 交互系统 ---
-
-        function talkTo(charId) {
-            // 解锁档案
+        // --- 交互系统：对话与物品调查 ---
+        
+        // 角色对话（支持多级分支，topic默认为"default"）
+        async function talkTo(charId, topicId = "default") {
+            event.stopPropagation();
             if (!state.unlockedChars.includes(charId)) {
                 state.unlockedChars.push(charId);
                 renderProfiles();
             }
 
             const char = db.characters[charId];
-            const diag = char.dialogues.default; // 这里可以扩展为根据 flags 选取不同的对话
+            const diagData = char.dialogues[topicId];
+            
+            if (!diagData) return alert("没有找到对话数据：" + topicId);
 
             document.getElementById('dialogue-box').style.display = 'block';
-            document.getElementById('speaker').innerText = char.name;
-            document.getElementById('content').innerHTML = diag.text;
+            document.getElementById('speaker').innerText = `与 ${char.name} 对话`;
+            
+            // 加载对话的 MD 文件
+            document.getElementById('content').innerHTML = await fetchMD(`./data/dialogues/${diagData.file}`);
 
-            // 记录 flag 和耗时
-            if (diag.setFlag) state.flags[diag.setFlag] = true;
-            if (diag.cost) advanceTime(diag.cost);
+            if (diagData.setFlag) state.flags[diagData.setFlag] = true;
+            if (diagData.cost) advanceTime(diagData.cost);
         }
+
+        // 物品调查
+        async function investigate(itemId) {
+            event.stopPropagation();
+            const itemData = db.items[itemId];
+            if (!itemData) return;
+
+            document.getElementById('dialogue-box').style.display = 'block';
+            document.getElementById('speaker').innerText = "调查线索";
+            
+            // 加载物品描述的 MD 文件
+            document.getElementById('content').innerHTML = await fetchMD(`./data/dialogues/${itemData.file}`);
+
+            if (itemData.cost) advanceTime(itemData.cost);
+        }
+
+        function closeDialogue() {
+            document.getElementById('dialogue-box').style.display = 'none';
+        }
+
+        // --- 档案与解密 ---
 
         function renderProfiles() {
             const list = document.getElementById('char-list');
@@ -216,14 +222,11 @@
             `).join('');
         }
 
-        // --- 解密与关键词 ---
-
         function collectKeyword(word) {
+            event.stopPropagation();
             if (!state.keywords.includes(word)) {
                 state.keywords.push(word);
                 renderInventory();
-                // 阻止事件冒泡，防止点击关键词时触发父元素的关闭等操作
-                event.stopPropagation(); 
             }
         }
 
@@ -236,7 +239,6 @@
 
         function selectKeyword(element, word) {
             state.selectedKeyword = word;
-            // 处理UI高亮
             document.querySelectorAll('.keyword-item').forEach(el => el.classList.remove('selected'));
             element.classList.add('selected');
         }
@@ -262,17 +264,10 @@
         function checkWin() {
             let isWin = true;
             Object.keys(db.puzzle.answers).forEach(key => {
-                if (document.getElementById(`slot-${key}`).innerText !== db.puzzle.answers[key]) {
-                    isWin = false;
-                }
+                if (document.getElementById(`slot-${key}`).innerText !== db.puzzle.answers[key]) isWin = false;
             });
-            
-            if (isWin) {
-                alert("真相大白！你成功打破了循环。");
-            } else {
-                alert("线索似乎拼凑不上，再找找看...");
-                advanceTime(5); // 验错惩罚时间
-            }
+            if (isWin) alert("真相大白！");
+            else { alert("线索不匹配..."); advanceTime(5); }
         }
 
         window.onload = initGame;
