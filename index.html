@@ -31,6 +31,14 @@
         .log-entry.dialogue { border-left: 4px solid #8b0000; padding-left: 15px; background: rgba(139,0,0,0.02); }
         .log-entry.system { text-align: center; color: #888; font-style: italic; border: none; }
 
+        /* 瀑布流中的对话选项按钮 */
+        .dialogue-options { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .dialogue-btn { padding: 6px 15px; border: 1px solid #8b0000; background: #fff; color: #8b0000; cursor: pointer; border-radius: 4px; font-family: "serif"; font-size: 1rem; transition: 0.2s; }
+        .dialogue-btn:hover { background: #8b0000; color: #fff; }
+        
+        /* 玩家做出选择后留下的文本记录 */
+        .player-choice-text { color: #555; font-style: italic; margin-top: 10px; border-left: 3px solid #ccc; padding-left: 10px; }
+
         /* 底部悬浮的行动区（当前NPC） */
         #action-area { padding: 15px 40px; border-top: 2px solid #8b0000; background: #f4f1ea; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
 
@@ -259,41 +267,80 @@
             document.getElementById('nav-bar').innerHTML = html;
         }
 
+       // ==========================================
+        // 分支对话系统
         // ==========================================
-        // 互动系统 (对话 / 调查)
-        // ==========================================
-        async function talkTo(charId, topicId = "default") {
+        
+        // 1. 唤出对话选项菜单（打印在日志流中）
+        function talkTo(charId, menuId = "root") {
             if(event) event.stopPropagation();
             
-            let isFirstTime = false; // 记录是否是初次见面
-            
-            // 解锁档案与快捷互动
+            // 解锁档案
             if (!state.unlockedChars.includes(charId)) {
                 state.unlockedChars.push(charId);
                 renderProfiles();
-                isFirstTime = true; // 标记为新认识的角色
+                updateActionArea(); // 认识新角色后刷新底部快捷栏
             }
 
             const char = db.characters[charId];
-            const diagData = char.dialogues[topicId];
-            
-            if (!diagData) {
-                appendToLog(`系统提示`, `<p style="color:red">找不到该话题的配置数据。</p>`, 'system');
-                return;
+            const menu = char.interactions[menuId];
+            if (!menu) return;
+
+            // 生成唯一的 ID，用于后续点击时精准销毁这组按钮
+            const uniqueId = "opts-" + Date.now();
+            let optionsHTML = "";
+
+            // 遍历选项，检查显示条件
+            menu.options.forEach((opt, index) => {
+                // 如果需要特定线索，但玩家没有，则跳过渲染
+                if (opt.reqKeyword && !state.keywords.includes(opt.reqKeyword)) return;
+                // 如果需要特定前置事件，但未触发，则跳过
+                if (opt.reqFlag && !state.flags[opt.reqFlag]) return;
+
+                optionsHTML += `<button class="dialogue-btn" onclick="executeOption('${charId}', '${menuId}', ${index}, '${uniqueId}')">${opt.label}</button>`;
+            });
+
+            if (optionsHTML === "") {
+                optionsHTML = `<span style="color:#999;">(没有合适的话题)</span>`;
             }
 
-            const contentHTML = await fetchMDSection(`./data/dialogues/${char.dialogueFile}`, topicId);
-            appendToLog(`与 ${char.name} 的对话`, contentHTML, 'dialogue');
+            const finalHTML = `
+                <div id="${uniqueId}-container">
+                    <p>${menu.prompt}</p>
+                    <div class="dialogue-options" id="${uniqueId}">${optionsHTML}</div>
+                </div>
+            `;
 
-            // 结算耗时与状态
-            if (diagData.setFlag) state.flags[diagData.setFlag] = true;
-            
-            if (diagData.cost) {
-                advanceTime(diagData.cost); // 时间流逝内部会自动调用 updateActionArea()
-            } else if (isFirstTime) {
-                // 如果对话没有耗费时间，但也认识了新角色，强制刷新底部的区域
-                updateActionArea();
+            appendToLog(`与 ${char.name} 交谈`, finalHTML, 'dialogue');
+        }
+
+        // 2. 执行玩家的选择
+        async function executeOption(charId, menuId, optIndex, uniqueId) {
+            const char = db.characters[charId];
+            const opt = char.interactions[menuId].options[optIndex];
+
+            // 步骤 A：清理 UI。把按钮组替换成玩家的选择文本
+            const container = document.getElementById(`${uniqueId}-container`);
+            if (container) {
+                container.innerHTML = `<div class="player-choice-text">▶ 玩家：${opt.label}</div>`;
             }
+
+            // 步骤 B：处理取消/离开
+            if (opt.action === "cancel") {
+                if (opt.cost) advanceTime(opt.cost);
+                return; // 直接结束
+            }
+
+            // 步骤 C：读取 MD 文件打印 NPC 的回应
+            if (opt.topicId) {
+                const contentHTML = await fetchMDSection(`./data/dialogues/${char.dialogueFile}`, opt.topicId);
+                // 追加打印 NPC 的话，且不再带有主标题，视觉上与玩家的选择连在一起
+                appendToLog(null, contentHTML, 'dialogue'); 
+            }
+
+            // 步骤 D：结算状态与时间
+            if (opt.setFlag) state.flags[opt.setFlag] = true;
+            if (opt.cost) advanceTime(opt.cost);
         }
         async function investigate(itemId) {
             if(event) event.stopPropagation();
