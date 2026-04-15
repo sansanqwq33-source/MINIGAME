@@ -24,7 +24,10 @@
             { "label": "出示【银色钥匙】", "topicId": "show_key", "reqKeyword": "银色钥匙", "cost": 10 },
             { "label": "没什么事", "action": "cancel", "cost": 0 }
           ]
-  }},
+        }
+      }
+    }
+  },
   "puzzle": {
     "template": "事件的起因是 {who} 弄丢了 {item}。",
     "answers": { "who": "角色A", "item": "银色钥匙" }
