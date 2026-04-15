@@ -2,27 +2,25 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Time Loop Decipher</title>
+    <title>时间循环：解密</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { display: grid; grid-template-columns: 250px 1fr 300px; height: 100vh; margin: 0; background: #f0eee9; font-family: "serif"; }
+        #profile-panel, #logic-panel { background: #e2dfd8; padding: 20px; overflow-y: auto; }
+        #profile-panel { border-right: 2px solid #ccc; }
+        #logic-panel { border-left: 2px solid #ccc; }
         
-        /* 左侧：人物档案 */
-        #profile-panel { background: #e2dfd8; border-right: 2px solid #ccc; padding: 20px; overflow-y: auto; }
-        .char-card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 14px; }
+        #main-screen { padding: 50px; position: relative; overflow-y: auto; line-height: 1.8;}
+        #story-text { font-size: 1.2rem; }
+        #dialogue-box { background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 8px; margin-top: 20px; display: none; cursor: pointer; }
 
-        /* 中间：剧情主屏幕 */
-        #main-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px; text-align: center; position: relative; }
-        #story-text { font-size: 1.2rem; line-height: 2; margin-bottom: 30px; }
-        #dialogue-box { background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 8px; width: 80%; display: none; }
+        .char-card { background: white; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .keyword-slot { display: inline-block; min-width: 60px; border-bottom: 2px dashed #8b0000; margin: 0 5px; text-align: center; cursor: pointer; color: #8b0000; font-weight: bold; }
+        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 5px 10px; margin: 5px; border-radius: 3px; cursor: pointer; font-size: 14px; }
 
-        /* 右侧：谜题与关键词 */
-        #logic-panel { background: #e2dfd8; border-left: 2px solid #ccc; padding: 20px; display: flex; flex-direction: column; }
-        .keyword-slot { background: #fff; border: 1px dashed #999; min-height: 30px; margin: 5px 0; padding: 5px; cursor: pointer; color: #8b0000; font-weight: bold; }
-        .keyword-item { display: inline-block; background: #8b0000; color: white; padding: 5px 10px; margin: 5px; border-radius: 3px; cursor: pointer; }
-
-        /* 交互高亮 */
-        .interact { color: #2a5caa; cursor: pointer; text-decoration: underline; }
-        .keyword { color: #8b0000; cursor: pointer; font-weight: bold; border-bottom: 2px solid; }
+        /* MD 文本中的交互高亮 */
+        .interact { color: #2a5caa; cursor: pointer; border-bottom: 1px dashed #2a5caa; font-weight: bold; }
+        .keyword { color: #8b0000; cursor: pointer; font-weight: bold; border-bottom: 1px dashed #8b0000; }
     </style>
 </head>
 <body>
@@ -34,50 +32,67 @@
 
     <div id="main-screen">
         <div id="story-text"></div>
+        
         <div id="dialogue-box" onclick="this.style.display='none'">
             <strong id="speaker"></strong>: <span id="content"></span>
-            <div style="font-size: 12px; margin-top: 10px; color: #aaa;">(点击关闭)</div>
         </div>
     </div>
 
     <div id="logic-panel">
-        <h3>解密线索</h3>
+        <h3>逻辑推演</h3>
         <div id="puzzle-area"></div>
         <hr>
         <h3>关键词栏</h3>
         <div id="inventory"></div>
-        <button onclick="checkWin()" style="margin-top:20px;">验证真相</button>
+        <button onclick="checkWin()" style="margin-top:20px; padding: 10px; width: 100%; cursor: pointer;">验证真相</button>
     </div>
 
     <script>
-        // 这里放入上面的 gameData 对象
-        // 游戏运行时状态
+        let gameData = {};
         let currentKeywords = [];
         let selectedKeyword = null;
 
-        function init() {
-            // 渲染初始场景
-            document.getElementById('story-text').innerHTML = gameData.scenes.start.text;
-            // 渲染档案
-            renderProfiles();
-            // 渲染谜题位
-            renderPuzzle();
+        // 核心：启动游戏并加载所有数据
+        async function initGame() {
+            try {
+                // 1. 加载 JSON 配置
+                const configRes = await fetch('./data/config.json');
+                gameData = await configRes.json();
+                
+                // 2. 渲染静态 UI
+                renderProfiles();
+                renderPuzzle();
+                
+                // 3. 加载第一幕 Markdown
+                await loadScene('scene_01');
+            } catch (error) {
+                document.getElementById('story-text').innerHTML = "<p style='color:red;'>加载失败。请确保你在本地服务器环境下运行，而不是直接双击HTML文件。</p>";
+                console.error(error);
+            }
         }
 
-        // 1. 对话系统
-        function showDialogue(id) {
-            const diag = gameData.dialogues[id][0]; // 简化版只取第一句
+        // 加载并解析 Markdown 场景
+        async function loadScene(sceneName) {
+            const res = await fetch(`./data/${sceneName}.md`);
+            const mdText = await res.text();
+            // 使用 marked 库将 markdown 转换为 html
+            document.getElementById('story-text').innerHTML = marked.parse(mdText);
+        }
+
+        /* --- 以下是具体的交互逻辑 --- */
+
+        function showDialogue(charId) {
+            const diag = gameData.dialogues[charId];
+            if(!diag) return;
             document.getElementById('dialogue-box').style.display = 'block';
             document.getElementById('speaker').innerText = diag.speaker;
             document.getElementById('content').innerHTML = diag.content;
         }
 
-        // 2. 收集关键词
         function collectKeyword(word) {
             if (!currentKeywords.includes(word)) {
                 currentKeywords.push(word);
                 renderInventory();
-                alert(`获得关键词：【${word}】`);
             }
         }
 
@@ -88,16 +103,17 @@
             ).join('');
         }
 
-        // 3. 填空系统
         function selectKeyword(word) {
             selectedKeyword = word;
-            alert("已选中：" + word + "，请点击右侧空格填入");
+            // 简单提示一下选中了
+            document.querySelectorAll('.keyword-item').forEach(el => el.style.opacity = '0.5');
+            event.target.style.opacity = '1';
         }
 
         function renderPuzzle() {
             let html = gameData.puzzle.template;
             Object.keys(gameData.puzzle.answers).forEach(key => {
-                html = html.replace(`{${key}}`, `<span class="keyword-slot" onclick="fillSlot(this)">____</span>`);
+                html = html.replace(`{${key}}`, `<span class="keyword-slot" id="slot-${key}" onclick="fillSlot(this)">____</span>`);
             });
             document.getElementById('puzzle-area').innerHTML = html;
         }
@@ -106,12 +122,13 @@
             if (selectedKeyword) {
                 el.innerText = selectedKeyword;
                 selectedKeyword = null;
+                // 恢复关键词列表的透明度
+                document.querySelectorAll('.keyword-item').forEach(el => el.style.opacity = '1');
             } else {
                 el.innerText = "____";
             }
         }
 
-        // 4. 档案系统
         function renderProfiles() {
             const list = document.getElementById('char-list');
             list.innerHTML = gameData.characters.map(c => `
@@ -123,11 +140,20 @@
         }
 
         function checkWin() {
-            // 这里可以根据空格里的文字和 gameData.puzzle.answers 对比
-            alert("正在验证逻辑链...");
+            let isWin = true;
+            Object.keys(gameData.puzzle.answers).forEach(key => {
+                const userAns = document.getElementById(`slot-${key}`).innerText;
+                if (userAns !== gameData.puzzle.answers[key]) {
+                    isWin = false;
+                }
+            });
+            
+            if (isWin) alert("推理正确！时间循环已打破。");
+            else alert("逻辑存在漏洞...时间开始倒流。");
         }
 
-        window.onload = init;
+        // 页面加载完成后执行
+        window.onload = initGame;
     </script>
 </body>
 </html>
