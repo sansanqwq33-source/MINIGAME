@@ -1,13 +1,64 @@
 {
-    "characters": [
-        { "id": "A", "name": "角色A", "profile": "走廊里遇到的神秘人，神色慌张。" },
-        { "id": "B", "name": "管家", "profile": "在宅邸工作了30年，知道很多秘密。" }
-    ],
-    "dialogues": {
-        "charA": { "speaker": "角色A", "content": "你怎么在这？顺便说一下，我刚丢了一把 <span class='keyword' onclick='collectKeyword(\"银色钥匙\")'>银色钥匙</span>。" }
+  "locations": {
+    "hall": { "name": "大厅", "desc": "一楼的大厅，墙上挂着古老的时钟。" },
+    "garden": { "name": "花园", "desc": "杂草丛生的花园，光线昏暗。" },
+    "idol_room": { "name": "深处的房间", "desc": "（这里是终焉之地）" }
+  },
+  "characters": {
+    "charA": { "name": "管家", "profile": "宅邸的管家，右腿似乎受过伤。" },
+    "charB": { "name": "园丁", "profile": "沉默寡言，身上总带着泥土味。" }
+  },
+  "schedules": {
+    "charA": {
+      "default": [
+        { "start": 540, "end": 720, "loc": "hall" },
+        { "start": 720, "end": 1440, "loc": "garden" }
+      ],
+      "angry_route": [
+        { "start": 540, "end": 1440, "loc": "hall" } 
+      ]
     },
-    "puzzle": {
-        "template": "凶手是 {who}，他使用了 {item}。",
-        "answers": { "who": "角色A", "item": "银色钥匙" }
+    "charB": {
+      "default": [
+        { "start": 540, "end": 1440, "loc": "garden" }
+      ]
     }
+  },
+  "dialogues": {
+    "charA_meet": {
+      "text": "管家：您需要点什么吗？",
+      "choices": [
+        { 
+          "text": "询问他的腿伤（耗时10分钟）", 
+          "timeCost": 10,
+          "actions": [
+            { "type": "unlockProfile", "target": "charA" },
+            { "type": "addKeyword", "target": "拐杖" }
+          ],
+          "next": "charA_talk_leg"
+        },
+        { 
+          "text": "指责他在说谎（耗时5分钟，触发日程改变）", 
+          "timeCost": 5,
+          "actions": [
+            { "type": "unlockProfile", "target": "charA" },
+            { "type": "changeSchedule", "target": "charA", "newRoute": "angry_route" }
+          ],
+          "next": "charA_angry"
+        }
+      ]
+    },
+    "charA_talk_leg": {
+      "text": "管家：这是旧伤了...（他递给你一把【拐杖】）",
+      "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }]
+    },
+    "charA_angry": {
+      "text": "管家：您太过分了！我今天哪里都不去了，就在这盯着您！",
+      "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }]
+    },
+    "idol_event": {
+      "text": "偶像：时间到了，你找到真相了吗？",
+      "choices": []
+    }
+  }
 }
