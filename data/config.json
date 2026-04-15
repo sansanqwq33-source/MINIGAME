@@ -1,64 +1,36 @@
 {
+  "startState": {
+    "time": 540,
+    "location": "hallway"
+  },
   "locations": {
-    "hall": { "name": "大厅", "desc": "一楼的大厅，墙上挂着古老的时钟。" },
-    "garden": { "name": "花园", "desc": "杂草丛生的花园，光线昏暗。" },
-    "idol_room": { "name": "深处的房间", "desc": "（这里是终焉之地）" }
+    "hallway": { "name": "昏暗走廊", "baseText": "一条长长的走廊。由于光线昏暗，你看不清远处的尽头。" },
+    "kitchen": { "name": "厨房", "baseText": "案板上放着切了一半的蔬菜。炉子上的水壶正在冒热气。" }
   },
   "characters": {
-    "charA": { "name": "管家", "profile": "宅邸的管家，右腿似乎受过伤。" },
-    "charB": { "name": "园丁", "profile": "沉默寡言，身上总带着泥土味。" }
-  },
-  "schedules": {
-    "charA": {
-      "default": [
-        { "start": 540, "end": 720, "loc": "hall" },
-        { "start": 720, "end": 1440, "loc": "garden" }
+    "A": {
+      "name": "角色A",
+      "profile": "在走廊遇到的人。神色慌张，似乎在隐瞒什么。",
+      "schedules": [
+        { "loc": "hallway", "start": 540, "end": 720 },
+        { "loc": "kitchen", "start": 720, "end": 1440, "reqFlag": "A_went_kitchen" },
+        { "loc": "hallway", "start": 720, "end": 1440, "excludeFlag": "A_went_kitchen" }
       ],
-      "angry_route": [
-        { "start": 540, "end": 1440, "loc": "hall" } 
-      ]
-    },
-    "charB": {
-      "default": [
-        { "start": 540, "end": 1440, "loc": "garden" }
-      ]
+      "dialogues": {
+        "default": {
+          "text": "你问我怎么在这？我当然在这！顺便说一下，地上那把 <span class='keyword' onclick='collectKeyword(\"银色钥匙\")'>银色钥匙</span> 是我的。",
+          "cost": 15,
+          "setFlag": "A_went_kitchen" 
+        }
+      }
     }
   },
-  "dialogues": {
-    "charA_meet": {
-      "text": "管家：您需要点什么吗？",
-      "choices": [
-        { 
-          "text": "询问他的腿伤（耗时10分钟）", 
-          "timeCost": 10,
-          "actions": [
-            { "type": "unlockProfile", "target": "charA" },
-            { "type": "addKeyword", "target": "拐杖" }
-          ],
-          "next": "charA_talk_leg"
-        },
-        { 
-          "text": "指责他在说谎（耗时5分钟，触发日程改变）", 
-          "timeCost": 5,
-          "actions": [
-            { "type": "unlockProfile", "target": "charA" },
-            { "type": "changeSchedule", "target": "charA", "newRoute": "angry_route" }
-          ],
-          "next": "charA_angry"
-        }
-      ]
-    },
-    "charA_talk_leg": {
-      "text": "管家：这是旧伤了...（他递给你一把【拐杖】）",
-      "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }]
-    },
-    "charA_angry": {
-      "text": "管家：您太过分了！我今天哪里都不去了，就在这盯着您！",
-      "choices": [{ "text": "结束对话", "timeCost": 0, "actions": [], "next": null }]
-    },
-    "idol_event": {
-      "text": "偶像：时间到了，你找到真相了吗？",
-      "choices": []
-    }
+  "idolEvent": {
+    "text": "时间已至午夜，一切归于虚无。偶像在虚空中注视着你：\n\n「你依然在迷局中徘徊。去注意角色A在12点（720）之后的动向吧。」",
+    "btnText": "重新开始这一天"
+  },
+  "puzzle": {
+    "template": "事件的起因是 {who} 弄丢了 {item}。",
+    "answers": { "who": "角色A", "item": "银色钥匙" }
   }
 }
