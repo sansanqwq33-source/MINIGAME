@@ -1,0 +1,13 @@
+{
+    "characters": [
+        { "id": "A", "name": "角色A", "profile": "走廊里遇到的神秘人，神色慌张。" },
+        { "id": "B", "name": "管家", "profile": "在宅邸工作了30年，知道很多秘密。" }
+    ],
+    "dialogues": {
+        "charA": { "speaker": "角色A", "content": "你怎么在这？顺便说一下，我刚丢了一把 <span class='keyword' onclick='collectKeyword(\"银色钥匙\")'>银色钥匙</span>。" }
+    },
+    "puzzle": {
+        "template": "凶手是 {who}，他使用了 {item}。",
+        "answers": { "who": "角色A", "item": "银色钥匙" }
+    }
+}
