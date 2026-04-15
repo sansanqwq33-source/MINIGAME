@@ -72,7 +72,7 @@
         <div id="story-log"></div>
         
         <div id="action-area">
-            <h4 style="margin: 0 0 10px 0; color: #8b0000;">可互动的目标</h4>
+            <h4 style="margin: 0 0 10px 0; color: #8b0000;"在这里的人：</h4>
             <div id="npc-area"></div>
         </div>
     </div>
@@ -226,13 +226,14 @@
             entry.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
-        // 刷新底部悬浮的NPC区
+        // 刷新底部悬浮的NPC
         function updateActionArea() {
             let npcHTML = "";
             for (let charId in db.characters) {
                 if (charId === 'idol') continue;
                 const char = db.characters[charId];
                 
+                // 1. 检查角色此刻是否在这个地点
                 const activeSchedule = char.schedules.find(s => {
                     if (state.time < s.start || state.time >= s.end) return false;
                     if (s.reqFlag && !state.flags[s.reqFlag]) return false;
@@ -240,11 +241,14 @@
                     return true;
                 });
 
-                if (activeSchedule && activeSchedule.loc === state.location) {
+                // 2. 新增条件：只有“已在此地点” 且 “已经互动过（在解锁列表中）”的角色，才会显示在底部
+                if (activeSchedule && activeSchedule.loc === state.location && state.unlockedChars.includes(charId)) {
                     npcHTML += `<span class='interact' style='margin-right:20px; display:inline-block;' onclick='talkTo("${charId}")'>💬 与 ${char.name} 交谈</span>`;
                 }
             }
-            document.getElementById('npc-area').innerHTML = npcHTML || "<span style='color:#999; font-style:italic;'>环顾四周，没有其他人。</span>";
+            
+            // 如果列表为空，给玩家一个探索提示
+            document.getElementById('npc-area').innerHTML = npcHTML || "<span style='color:#999; font-style:italic;'>没有认识的人。</span>";
         }
 
         function renderNav() {
