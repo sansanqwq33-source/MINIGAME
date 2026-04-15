@@ -265,10 +265,13 @@
         async function talkTo(charId, topicId = "default") {
             if(event) event.stopPropagation();
             
-            // 解锁档案
+            let isFirstTime = false; // 记录是否是初次见面
+            
+            // 解锁档案与快捷互动
             if (!state.unlockedChars.includes(charId)) {
                 state.unlockedChars.push(charId);
                 renderProfiles();
+                isFirstTime = true; // 标记为新认识的角色
             }
 
             const char = db.characters[charId];
@@ -284,9 +287,14 @@
 
             // 结算耗时与状态
             if (diagData.setFlag) state.flags[diagData.setFlag] = true;
-            if (diagData.cost) advanceTime(diagData.cost);
+            
+            if (diagData.cost) {
+                advanceTime(diagData.cost); // 时间流逝内部会自动调用 updateActionArea()
+            } else if (isFirstTime) {
+                // 如果对话没有耗费时间，但也认识了新角色，强制刷新底部的区域
+                updateActionArea();
+            }
         }
-
         async function investigate(itemId) {
             if(event) event.stopPropagation();
             const itemData = db.items[itemId];
