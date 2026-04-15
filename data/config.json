@@ -4,21 +4,23 @@
     "hallway": { "name": "昏暗走廊", "file": "hallway.md" },
     "kitchen": { "name": "厨房", "file": "kitchen.md" }
   },
+  "itemsFile": "items.md",
+  "items": {
+    "note": { "cost": 5 }
+  },
   "characters": {
     "A": {
       "name": "角色A",
       "profile": "在走廊遇到的人。神色慌张。",
+      "dialogueFile": "A_dialogues.md",
       "schedules": [
         { "loc": "hallway", "start": 540, "end": 1440 }
       ],
       "dialogues": {
-        "default": { "file": "A_default.md", "cost": 10 },
-        "ask_key": { "file": "A_ask_key.md", "cost": 5, "setFlag": "knows_about_key" }
+        "default": { "cost": 10 },
+        "ask_key": { "cost": 5, "setFlag": "knows_about_key" }
       }
     }
-  },
-  "items": {
-    "note": { "file": "item_note.md", "cost": 5 }
   },
   "puzzle": {
     "template": "事件的起因是 {who} 弄丢了 {item}。",
